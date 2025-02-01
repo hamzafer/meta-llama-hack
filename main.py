@@ -15,10 +15,6 @@ from dotenv import load_dotenv
 
 app = Flask(__name__)
 
-# Replace with your actual API Key and Search Engine ID
-# API_KEY = os.environ.get("GOOGLE_SEARCH_API_KEY")  # Set in your environment
-# SEARCH_ENGINE_ID = os.environ.get("GOOGLE_SEARCH_ENGINE_ID")  # Set in your environment
-
 # Load .env file
 load_dotenv()
 
@@ -104,8 +100,8 @@ def google_search(query, gl="no", hl="no"):
     """
     url = "https://www.googleapis.com/customsearch/v1"
     params = {
-        "key": "AIzaSyCgYM01RkUmNKuc8-gf-wXkYPzG0REULgY",
-        "cx": "8685ee9e6bd8b46dc",
+        "key": api_key,
+        "cx": search_engine_id,
         "q": query,
         "gl": gl,  # Country location
         "hl": hl   # Language hint
