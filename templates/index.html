@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Powered Search Engine</title>
+</head>
+<body>
+    <h1>Search Google in Norwegian & Summarize with Llama3.2</h1>
+    <form action="/" method="post">
+        <label for="query">Search Query:</label><br>
+        <input type="text" id="query" name="query" size="80" required><br><br>
+
+        <label for="comm_lang">Communication Language (for summary):</label><br>
+        <input type="text" id="comm_lang" name="comm_lang" value="en" required><br><br>
+
+        <input type="submit" value="Search">
+    </form>
+
+    {% if results %}
+        <h2>Search Results:</h2>
+        <ul>
+            {% for result in results %}
+                <li>
+                    <a href="{{ result.link }}" target="_blank">{{ result.title }}</a>
+                    <p>{{ result.snippet }}</p>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    {% if summary %}
+        <h2>Summary:</h2>
+        <p>{{ summary }}</p>
+    {% endif %}
+</body>
+</html>
