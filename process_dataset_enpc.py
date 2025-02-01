@@ -1,6 +1,5 @@
 import json
 import xml.etree.ElementTree as ET
-
 import numpy as np
 
 
@@ -19,18 +18,18 @@ def load_tmx(tmx_file):
             texts[lang] = seg
 
         if "en" in texts and "nb" in texts:
-            sentence_pairs.append({"norwegian": texts["en"], "english": texts["nb"]})
+            sentence_pairs.append({"english": texts["en"], "norwegian": texts["nb"]})
 
     return sentence_pairs
 
 
 # Compute dataset statistics
 def compute_stats(data):
-    en_lengths = [len(pair["norwegian"].split()) for pair in data]
-    nb_lengths = [len(pair["english"].split()) for pair in data]
+    en_lengths = [len(pair["english"].split()) for pair in data]
+    nb_lengths = [len(pair["norwegian"].split()) for pair in data]
 
-    en_vocab = set(word.lower() for pair in data for word in pair["norwegian"].split())
-    nb_vocab = set(word.lower() for pair in data for word in pair["english"].split())
+    en_vocab = set(word.lower() for pair in data for word in pair["english"].split())
+    nb_vocab = set(word.lower() for pair in data for word in pair["norwegian"].split())
 
     stats = {
         "Total sentence pairs": len(data),
