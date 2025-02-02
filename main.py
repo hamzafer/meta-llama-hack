@@ -12,68 +12,71 @@ from flask import Flask, request, render_template
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
-app = Flask(__name__)
-
 # Load environment variables
 load_dotenv()
-api_key = os.getenv("API_KEY")
-search_engine_id = os.getenv("SEARCH_ENGINE_ID")
+
+# Configuration
+API_KEY = os.getenv("API_KEY")
+SEARCH_ENGINE_ID = os.getenv("SEARCH_ENGINE_ID")
+LLAMA_API_URL = os.getenv("LLAMA_API_URL", "http://localhost:11434/api/generate")
+LLAMA_MODEL = os.getenv("LLAMA_MODEL", "llama3.3:70b")
+DEFAULT_LANG = os.getenv("DEFAULT_LANG", "en")
+DEFAULT_COUNTRY = os.getenv("DEFAULT_COUNTRY", "no")
+
+app = Flask(__name__)
+
 
 def call_llama(prompt: str) -> str:
     """
-    Calls the Llama3.3:70b model via a local API running on your GPU.
+    Calls the Llama model via a local API.
     """
-    url = "http://localhost:11434/api/generate"
     payload = {
-        "model": "llama3.3:70b",
+        "model": LLAMA_MODEL,
         "prompt": prompt,
         "stream": False
     }
-    
+
     try:
-        response = requests.post(url, json=payload)
-        response.raise_for_status()  # Raise an error for bad responses
+        response = requests.post(LLAMA_API_URL, json=payload)
+        response.raise_for_status()
         result_json = response.json()
-        return result_json.get("response", "Error: No response from Llama3.3")
+        return result_json.get("response", "Error: No response from Llama")
     except requests.RequestException as e:
-        return f"Error calling Llama3.3: {e}"
+        return f"Error calling Llama: {e}"
+
 
 def llama_translate(text: str, target_lang: str) -> str:
     """
-    Uses Llama3.3 (Ollama) to translate text into the target language.
+    Uses Llama to translate text into the target language.
     """
     prompt = f"Translate the following text into {target_lang}. ONLY output the translated text:\n\n{text}\n\nTranslation:"
     return call_llama(prompt)
 
-def google_search(query, gl="no", hl="no"):
+
+def google_search(query, gl=DEFAULT_COUNTRY, hl=DEFAULT_LANG):
     """
     Calls Google Custom Search API with location and language-based filtering.
-    - `gl`: Country code (e.g., "no" for Norway).
-    - `hl`: Language hint (e.g., "no" for Norwegian).
     """
     url = "https://www.googleapis.com/customsearch/v1"
     params = {
-        "key": api_key,
-        "cx": search_engine_id,
+        "key": API_KEY,
+        "cx": SEARCH_ENGINE_ID,
         "q": query,
-        "gl": gl,  # Country location
-        "hl": hl   # Language hint
+        "gl": gl,
+        "hl": hl
     }
-
     try:
         response = requests.get(url, params=params)
         response.raise_for_status()
         results = response.json()
-
         if "error" in results:
             print("Google API Error:", results["error"])
-            return []  # Return empty list if there's an error
-
+            return []
         return results.get("items", [])
-
     except requests.RequestException as e:
         print("Google API Exception:", e)
         return []
+
 
 def get_webpage_text(url: str) -> str:
     """
@@ -83,47 +86,33 @@ def get_webpage_text(url: str) -> str:
         resp = requests.get(url, timeout=5)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
-        
-        # Remove unnecessary elements
         for tag in soup(["script", "style", "noscript"]):
             tag.decompose()
-        
-        return soup.get_text(separator="\n")[:1000]  # Limit to first 1000 characters
+        return soup.get_text(separator="\n")[:1000]
     except requests.RequestException as e:
         print(f"Error fetching {url}: {e}")
         return ""
 
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     results, summary = [], ""
-
     if request.method == "POST":
         query = request.form.get("query")
-        comm_lang = request.form.get("comm_lang", "en")  # Default to English
-
+        comm_lang = request.form.get("comm_lang", DEFAULT_LANG)
         if query:
-            # Translate query to Norwegian for better search results
             translated_query = llama_translate(query, "Norwegian")
-
-            # Perform Google Search
             search_results = google_search(translated_query)
-
-            # Extract title and snippet
-            articles = {result.get("title"): result.get("snippet") for result in search_results if result.get("title") and result.get("snippet")}
-
-            # Prepare summarization prompt
-            prompt = "\n".join([f"{i}. {title}: {snippet}" for i, (title, snippet) in enumerate(articles.items(), start=1)])
-
-            # Translate results back to the user's language
+            articles = {result.get("title"): result.get("snippet") for result in search_results if
+                        result.get("title") and result.get("snippet")}
+            prompt = "\n".join(
+                [f"{i}. {title}: {snippet}" for i, (title, snippet) in enumerate(articles.items(), start=1)])
             translated_text = llama_translate(prompt, comm_lang)
-
-            # Summarize the results
             summary_prompt = f"Summarize the following in English:\n\n{translated_text}\n\nSummary:"
             summary = call_llama(summary_prompt)
-
             results = search_results
-
     return render_template("index.html", results=results, summary=summary)
+
 
 if __name__ == "__main__":
     app.run(debug=True)
