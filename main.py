@@ -65,6 +65,8 @@ def call_llama(prompt: str) -> str:
     """
     Calls the Llama model via a local API.
     """
+    print("DEBUG: Calling Llama with prompt:")
+    print(prompt)
     payload = {
         "model": LLAMA_MODEL,
         "prompt": prompt,
@@ -74,23 +76,40 @@ def call_llama(prompt: str) -> str:
         response = requests.post(LLAMA_API_URL, json=payload)
         response.raise_for_status()
         result_json = response.json()
-        return result_json.get("response", "Error: No response from Llama")
+        llama_response = result_json.get("response", "Error: No response from Llama")
+        print("DEBUG: Received response from Llama:")
+        print(llama_response)
+        return llama_response
     except requests.RequestException as e:
-        return f"Error calling Llama: {e}"
+        error_msg = f"Error calling Llama: {e}"
+        print("DEBUG:", error_msg)
+        return error_msg
 
 
 def llama_translate(text: str, target_lang: str) -> str:
     """
     Uses Llama to translate text into the target language.
     """
+    print("DEBUG: Translating text:")
+    print(text)
+    print(f"DEBUG: Target language: {target_lang}")
     prompt = TRANSLATION_PROMPT_TEMPLATE.format(target_lang=target_lang, text=text)
-    return call_llama(prompt)
+    print("DEBUG: Translation prompt being sent to Llama:")
+    print(prompt)
+    translation = call_llama(prompt)
+    print("DEBUG: Translation result:")
+    print(translation)
+    return translation
 
 
 def google_search(query, gl=DEFAULT_COUNTRY, hl=DEFAULT_LANG):
     """
     Calls Google Custom Search API with location and language-based filtering.
     """
+    print("DEBUG: Performing Google search.")
+    print(f"DEBUG: Query: {query}")
+    print(f"DEBUG: Country (gl): {gl}")
+    print(f"DEBUG: Language (hl): {hl}")
     url = GOOGLE_SEARCH_API_URL
     params = {
         "key": API_KEY,
@@ -104,12 +123,16 @@ def google_search(query, gl=DEFAULT_COUNTRY, hl=DEFAULT_LANG):
         response.raise_for_status()
         results = response.json()
         if "error" in results:
-            print("Google API Error:", results["error"])
+            print("DEBUG: Google API Error:", results["error"])
             return []
         # Return only the top 10 results
-        return results.get("items", [])[:10]
+        items = results.get("items", [])[:10]
+        print("DEBUG: Google search results fetched:")
+        for i, item in enumerate(items, start=1):
+            print(f"DEBUG: Result {i}: Title: {item.get('title')}, Link: {item.get('link')}")
+        return items
     except requests.RequestException as e:
-        print("Google API Exception:", e)
+        print("DEBUG: Google API Exception:", e)
         return []
 
 
@@ -117,15 +140,20 @@ def get_webpage_text(url: str) -> str:
     """
     Fetches webpage content and extracts text.
     """
+    print(f"DEBUG: Fetching webpage text from URL: {url}")
     try:
         resp = requests.get(url, timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, BS_PARSER)
         for tag in soup(BS_TAGS_TO_REMOVE):
             tag.decompose()
-        return soup.get_text(separator=TEXT_SEPARATOR)[:MAX_TEXT_LENGTH]
+        webpage_text = soup.get_text(separator=TEXT_SEPARATOR)[:MAX_TEXT_LENGTH]
+        print("DEBUG: Extracted webpage text:")
+        print(webpage_text)
+        return webpage_text
     except requests.RequestException as e:
-        print(f"Error fetching {url}: {e}")
+        error_msg = f"Error fetching {url}: {e}"
+        print("DEBUG:", error_msg)
         return ""
 
 
@@ -141,10 +169,21 @@ def index():
         query = request.form.get(FORM_QUERY_KEY, "")
         comm_lang = request.form.get(FORM_COMM_LANG_KEY, DEFAULT_LANG)
         selected_country = request.form.get(FORM_COUNTRY_KEY, DEFAULT_COUNTRY)
+
+        print("DEBUG: Received form submission.")
+        print(f"DEBUG: User entered query: {query}")
+        print(f"DEBUG: User selected language: {comm_lang}")
+        print(f"DEBUG: User selected country: {selected_country}")
+
         if query:
             # Translate the query to the user's language
+            print("DEBUG: Translating the query...")
             translated_query = llama_translate(query, comm_lang)
+            print("DEBUG: Translated query:")
+            print(translated_query)
+
             # Call Google search API with the translated query, country, and language parameters
+            print("DEBUG: Calling Google Search API with the translated query...")
             search_results = google_search(translated_query, gl=selected_country, hl=comm_lang)
             results = []
             articles = {}
@@ -168,15 +207,27 @@ def index():
                 if title and snippet:
                     articles[title] = snippet
 
+            print("DEBUG: Fetched search results. Aggregating text for summarization...")
             # Create an aggregated text for summarization
             aggregated_text = TEXT_SEPARATOR.join(
                 [f"{i}. {title}: {snippet}" for i, (title, snippet) in enumerate(articles.items(), start=1)]
             )
+            print("DEBUG: Aggregated text:")
+            print(aggregated_text)
+
             # Translate aggregated text into the user's language
+            print("DEBUG: Translating aggregated text for summarization...")
             translated_text = llama_translate(aggregated_text, comm_lang)
+            print("DEBUG: Translated aggregated text:")
+            print(translated_text)
+
             # Build the summary prompt using the same language
             summary_prompt = SUMMARY_PROMPT_TEMPLATE.format(summary_lang=comm_lang, text=translated_text)
+            print("DEBUG: Summary prompt being sent to Llama:")
+            print(summary_prompt)
             summary = call_llama(summary_prompt)
+            print("DEBUG: Final summary:")
+            print(summary)
 
     return render_template(
         TEMPLATE_INDEX,
@@ -191,4 +242,5 @@ def index():
 
 
 if __name__ == "__main__":
+    print("DEBUG: Starting Flask app.")
     app.run(debug=FLASK_DEBUG)
