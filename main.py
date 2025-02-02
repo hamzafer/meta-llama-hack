@@ -1,11 +1,4 @@
 #!/usr/bin/env python3
-"""
-Google Search API + Llama3.3 (Ollama) for Translation & Summarization.
-- Uses Google Search API (with location-based search)
-- Uses Llama3.3 (Ollama) for translations (query/result)
-- Summarizes results with Llama3.3
-"""
-
 import os
 
 import requests
@@ -13,7 +6,7 @@ from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from flask import Flask, request, render_template
 
-# Load environment variables from a .env file if present
+# Load environment variables from .env file
 load_dotenv()
 
 # Core configuration (can be overridden via environment variables)
@@ -22,13 +15,8 @@ SEARCH_ENGINE_ID = os.getenv("SEARCH_ENGINE_ID")
 LLAMA_API_URL = os.getenv("LLAMA_API_URL", "http://localhost:11435/api/generate")
 LLAMA_MODEL = os.getenv("LLAMA_MODEL", "llama3.3")
 DEFAULT_LANG = os.getenv("DEFAULT_LANG", "en")
-DEFAULT_COUNTRY = os.getenv("DEFAULT_COUNTRY", "no")
-
-# Additional configurable parameters to eliminate hardcoded values:
+DEFAULT_COUNTRY = os.getenv("DEFAULT_COUNTRY", "us")
 GOOGLE_SEARCH_API_URL = os.getenv("GOOGLE_SEARCH_API_URL", "https://www.googleapis.com/customsearch/v1")
-# QUERY_TRANSLATION_LANG = os.getenv("QUERY_TRANSLATION_LANG", "Norwegian")
-QUERY_TRANSLATION_LANG = os.getenv("QUERY_TRANSLATION_LANG", "Japanese")
-SUMMARY_TARGET_LANG = os.getenv("SUMMARY_TARGET_LANG", "English")
 BS_PARSER = os.getenv("BS_PARSER", "html.parser")
 BS_TAGS_TO_REMOVE = os.getenv("BS_TAGS_TO_REMOVE", "script,style,noscript").split(',')
 TEXT_SEPARATOR = os.getenv("TEXT_SEPARATOR", "\n")
@@ -37,23 +25,40 @@ TEMPLATE_INDEX = os.getenv("TEMPLATE_INDEX", "index.html")
 REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "5"))
 FLASK_DEBUG = os.getenv("FLASK_DEBUG", "True").lower() in ("true", "1", "t")
 
-# Prompt templates (customizable to avoid hardcoding instructions)
+# Prompt templates (customizable)
 TRANSLATION_PROMPT_TEMPLATE = os.getenv(
     "TRANSLATION_PROMPT_TEMPLATE",
     "Translate the following text into {target_lang}. ONLY output the translated text:\n\n{text}\n\nTranslation:"
 )
-
 SUMMARY_PROMPT_TEMPLATE = os.getenv(
     "SUMMARY_PROMPT_TEMPLATE",
     "Summarize the following in {summary_lang}:\n\n{text}\n\nSummary:"
 )
 
-# Form keys and route (customizable)
+# Form field keys
 FORM_QUERY_KEY = os.getenv("FORM_QUERY_KEY", "query")
 FORM_COMM_LANG_KEY = os.getenv("FORM_COMM_LANG_KEY", "comm_lang")
+FORM_COUNTRY_KEY = os.getenv("FORM_COUNTRY_KEY", "country")
 ROUTE_INDEX = os.getenv("ROUTE_INDEX", "/")
 
 app = Flask(__name__)
+
+# Define supported countries and languages for the dropdown menus
+supported_countries = [
+    {"code": "us", "name": "United States"},
+    {"code": "no", "name": "Norway"},
+    {"code": "jp", "name": "Japan"},
+    {"code": "fr", "name": "France"},
+    {"code": "de", "name": "Germany"}
+]
+
+supported_languages = [
+    {"code": "en", "name": "English"},
+    {"code": "no", "name": "Norwegian"},
+    {"code": "jp", "name": "Japanese"},
+    {"code": "fr", "name": "French"},
+    {"code": "de", "name": "German"}
+]
 
 
 def call_llama(prompt: str) -> str:
@@ -101,7 +106,8 @@ def google_search(query, gl=DEFAULT_COUNTRY, hl=DEFAULT_LANG):
         if "error" in results:
             print("Google API Error:", results["error"])
             return []
-        return results.get("items", [])
+        # Return only the top 10 results
+        return results.get("items", [])[:10]
     except requests.RequestException as e:
         print("Google API Exception:", e)
         return []
@@ -125,30 +131,63 @@ def get_webpage_text(url: str) -> str:
 
 @app.route(ROUTE_INDEX, methods=["GET", "POST"])
 def index():
-    results, summary = [], ""
+    results = []
+    summary = ""
+    query = ""
+    selected_country = DEFAULT_COUNTRY
+    comm_lang = DEFAULT_LANG
+
     if request.method == "POST":
-        query = request.form.get(FORM_QUERY_KEY)
+        query = request.form.get(FORM_QUERY_KEY, "")
         comm_lang = request.form.get(FORM_COMM_LANG_KEY, DEFAULT_LANG)
+        selected_country = request.form.get(FORM_COUNTRY_KEY, DEFAULT_COUNTRY)
         if query:
-            # Translate the query using the configurable target language
-            translated_query = llama_translate(query, QUERY_TRANSLATION_LANG)
-            search_results = google_search(translated_query)
-            # Build a dictionary of articles from search results
-            articles = {
-                result.get("title"): result.get("snippet")
-                for result in search_results
-                if result.get("title") and result.get("snippet")
-            }
-            prompt = TEXT_SEPARATOR.join(
+            # Translate the query to the user's language
+            translated_query = llama_translate(query, comm_lang)
+            # Call Google search API with the translated query, country, and language parameters
+            search_results = google_search(translated_query, gl=selected_country, hl=comm_lang)
+            results = []
+            articles = {}
+            for result in search_results:
+                title = result.get("title")
+                snippet = result.get("snippet")
+                link = result.get("link")
+                # Try to get an image from the result (if available)
+                image_url = None
+                pagemap = result.get("pagemap", {})
+                if "cse_image" in pagemap:
+                    images = pagemap.get("cse_image")
+                    if images and isinstance(images, list):
+                        image_url = images[0].get("src")
+                results.append({
+                    "title": title,
+                    "snippet": snippet,
+                    "link": link,
+                    "image_url": image_url
+                })
+                if title and snippet:
+                    articles[title] = snippet
+
+            # Create an aggregated text for summarization
+            aggregated_text = TEXT_SEPARATOR.join(
                 [f"{i}. {title}: {snippet}" for i, (title, snippet) in enumerate(articles.items(), start=1)]
             )
-            # Translate the aggregated prompt into the community language
-            translated_text = llama_translate(prompt, comm_lang)
-            # Build the summary prompt using the configurable summary target language
-            summary_prompt = SUMMARY_PROMPT_TEMPLATE.format(summary_lang=SUMMARY_TARGET_LANG, text=translated_text)
+            # Translate aggregated text into the user's language
+            translated_text = llama_translate(aggregated_text, comm_lang)
+            # Build the summary prompt using the same language
+            summary_prompt = SUMMARY_PROMPT_TEMPLATE.format(summary_lang=comm_lang, text=translated_text)
             summary = call_llama(summary_prompt)
-            results = search_results
-    return render_template(TEMPLATE_INDEX, results=results, summary=summary)
+
+    return render_template(
+        TEMPLATE_INDEX,
+        results=results,
+        summary=summary,
+        query=query,
+        selected_country=selected_country,
+        comm_lang=comm_lang,
+        supported_countries=supported_countries,
+        supported_languages=supported_languages
+    )
 
 
 if __name__ == "__main__":
