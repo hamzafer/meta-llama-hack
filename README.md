@@ -13,7 +13,7 @@ We are a passionate team of developers and researchers dedicated to leveraging A
 on building **cutting-edge applications** that integrate **Llama models, NLP, and AI-driven automation** to tackle
 real-world challenges.
 
-# Local Search & Summarization Demo
+# The Local Llama 🦙
 
 This project is a demo application that:
 
