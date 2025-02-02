@@ -15,8 +15,7 @@
         <label for="query" class="form-label">Enter your query:</label>
         <input type="text" class="form-control" id="query" name="query" placeholder="Type your query here" value="{{ query }}">
       </div>
-      <div class="row">
-        <div class="col-md-6 mb-3">
+      <div class="mb-3">
           <label for="country" class="form-label">Select your country:</label>
           <select class="form-select" id="country" name="country">
             {% for country in supported_countries %}
@@ -25,17 +24,6 @@
             </option>
             {% endfor %}
           </select>
-        </div>
-        <div class="col-md-6 mb-3">
-          <label for="comm_lang" class="form-label">Select your language:</label>
-          <select class="form-select" id="comm_lang" name="comm_lang">
-            {% for lang in supported_languages %}
-            <option value="{{ lang.code }}" {% if lang.code == comm_lang %}selected{% endif %}>
-              {{ lang.name }}
-            </option>
-            {% endfor %}
-          </select>
-        </div>
       </div>
       <button type="submit" class="btn btn-primary">Search</button>
       <a href="{{ url_for('index') }}" class="btn btn-secondary">New Chat</a>

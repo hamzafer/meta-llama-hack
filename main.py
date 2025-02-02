@@ -9,12 +9,12 @@ from flask import Flask, request, render_template
 # Load environment variables from .env file
 load_dotenv()
 
-# Core configuration (can be overridden via environment variables)
+# Core configuration (overridable via environment variables)
 API_KEY = os.getenv("API_KEY")
 SEARCH_ENGINE_ID = os.getenv("SEARCH_ENGINE_ID")
 LLAMA_API_URL = os.getenv("LLAMA_API_URL", "http://localhost:11435/api/generate")
 LLAMA_MODEL = os.getenv("LLAMA_MODEL", "llama3.3")
-DEFAULT_LANG = os.getenv("DEFAULT_LANG", "en")
+DEFAULT_LANG = os.getenv("DEFAULT_LANG", "en")  # fallback language if country not found
 DEFAULT_COUNTRY = os.getenv("DEFAULT_COUNTRY", "us")
 GOOGLE_SEARCH_API_URL = os.getenv("GOOGLE_SEARCH_API_URL", "https://www.googleapis.com/customsearch/v1")
 BS_PARSER = os.getenv("BS_PARSER", "html.parser")
@@ -35,15 +35,14 @@ SUMMARY_PROMPT_TEMPLATE = os.getenv(
     "Summarize the following in {summary_lang}:\n\n{text}\n\nSummary:"
 )
 
-# Form field keys
+# Form field key for the query and country (language selection removed)
 FORM_QUERY_KEY = os.getenv("FORM_QUERY_KEY", "query")
-FORM_COMM_LANG_KEY = os.getenv("FORM_COMM_LANG_KEY", "comm_lang")
 FORM_COUNTRY_KEY = os.getenv("FORM_COUNTRY_KEY", "country")
 ROUTE_INDEX = os.getenv("ROUTE_INDEX", "/")
 
 app = Flask(__name__)
 
-# Define supported countries and languages for the dropdown menus
+# Supported countries for the dropdown menu
 supported_countries = [
     {"code": "us", "name": "United States"},
     {"code": "no", "name": "Norway"},
@@ -52,13 +51,14 @@ supported_countries = [
     {"code": "de", "name": "Germany"}
 ]
 
-supported_languages = [
-    {"code": "en", "name": "English"},
-    {"code": "no", "name": "Norwegian"},
-    {"code": "jp", "name": "Japanese"},
-    {"code": "fr", "name": "French"},
-    {"code": "de", "name": "German"}
-]
+# Mapping from country code to language code
+country_to_language = {
+    "us": "en",
+    "no": "no",  # Norwegian
+    "jp": "jp",  # Japanese (adjust if you need "ja")
+    "fr": "fr",
+    "de": "de"
+}
 
 
 def call_llama(prompt: str) -> str:
@@ -163,26 +163,27 @@ def index():
     summary = ""
     query = ""
     selected_country = DEFAULT_COUNTRY
-    comm_lang = DEFAULT_LANG
 
     if request.method == "POST":
         query = request.form.get(FORM_QUERY_KEY, "")
-        comm_lang = request.form.get(FORM_COMM_LANG_KEY, DEFAULT_LANG)
         selected_country = request.form.get(FORM_COUNTRY_KEY, DEFAULT_COUNTRY)
 
         print("DEBUG: Received form submission.")
         print(f"DEBUG: User entered query: {query}")
-        print(f"DEBUG: User selected language: {comm_lang}")
         print(f"DEBUG: User selected country: {selected_country}")
 
+        # Automatically determine the target language based on the selected country
+        comm_lang = country_to_language.get(selected_country, DEFAULT_LANG)
+        print(f"DEBUG: Determined translation language: {comm_lang}")
+
         if query:
-            # Translate the query to the user's language
+            # Translate the query into the country's language
             print("DEBUG: Translating the query...")
             translated_query = llama_translate(query, comm_lang)
             print("DEBUG: Translated query:")
             print(translated_query)
 
-            # Call Google search API with the translated query, country, and language parameters
+            # Call Google Search API with the translated query
             print("DEBUG: Calling Google Search API with the translated query...")
             search_results = google_search(translated_query, gl=selected_country, hl=comm_lang)
             results = []
@@ -215,13 +216,13 @@ def index():
             print("DEBUG: Aggregated text:")
             print(aggregated_text)
 
-            # Translate aggregated text into the user's language
+            # Translate aggregated text for summarization into the country's language
             print("DEBUG: Translating aggregated text for summarization...")
             translated_text = llama_translate(aggregated_text, comm_lang)
             print("DEBUG: Translated aggregated text:")
             print(translated_text)
 
-            # Build the summary prompt using the same language
+            # Build the summary prompt using the determined language
             summary_prompt = SUMMARY_PROMPT_TEMPLATE.format(summary_lang=comm_lang, text=translated_text)
             print("DEBUG: Summary prompt being sent to Llama:")
             print(summary_prompt)
@@ -235,9 +236,7 @@ def index():
         summary=summary,
         query=query,
         selected_country=selected_country,
-        comm_lang=comm_lang,
-        supported_countries=supported_countries,
-        supported_languages=supported_languages
+        supported_countries=supported_countries
     )
 
 
