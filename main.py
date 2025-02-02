@@ -2,9 +2,9 @@
 import os
 
 import requests
+import streamlit as st
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-from flask import Flask, request, render_template
 
 # Load environment variables from .env file
 load_dotenv()
@@ -21,9 +21,8 @@ BS_PARSER = os.getenv("BS_PARSER", "html.parser")
 BS_TAGS_TO_REMOVE = os.getenv("BS_TAGS_TO_REMOVE", "script,style,noscript").split(',')
 TEXT_SEPARATOR = os.getenv("TEXT_SEPARATOR", "\n")
 MAX_TEXT_LENGTH = int(os.getenv("MAX_TEXT_LENGTH", "1000"))
-TEMPLATE_INDEX = os.getenv("TEMPLATE_INDEX", "index.html")
 REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "5"))
-FLASK_DEBUG = os.getenv("FLASK_DEBUG", "True").lower() in ("true", "1", "t")
+FLASK_DEBUG = os.getenv("FLASK_DEBUG", "True").lower() in ("true", "1", "t")  # not used in Streamlit
 
 # Prompt templates (customizable)
 TRANSLATION_PROMPT_TEMPLATE = os.getenv(
@@ -34,13 +33,6 @@ SUMMARY_PROMPT_TEMPLATE = os.getenv(
     "SUMMARY_PROMPT_TEMPLATE",
     "Summarize the following in {summary_lang}:\n\n{text}\n\nSummary:"
 )
-
-# Form field key for the query and country (language selection removed)
-FORM_QUERY_KEY = os.getenv("FORM_QUERY_KEY", "query")
-FORM_COUNTRY_KEY = os.getenv("FORM_COUNTRY_KEY", "country")
-ROUTE_INDEX = os.getenv("ROUTE_INDEX", "/")
-
-app = Flask(__name__)
 
 # Supported countries for the dropdown menu
 supported_countries = [
@@ -55,7 +47,7 @@ supported_countries = [
 country_to_language = {
     "us": "en",
     "no": "no",  # Norwegian
-    "jp": "jp",  # Japanese (adjust if you need "ja")
+    "jp": "jp",  # Japanese (adjust if needed; sometimes "ja" is preferred)
     "fr": "fr",
     "de": "de"
 }
@@ -65,8 +57,8 @@ def call_llama(prompt: str) -> str:
     """
     Calls the Llama model via a local API.
     """
-    print("DEBUG: Calling Llama with prompt:")
-    print(prompt)
+    st.write("**DEBUG: Calling Llama with prompt:**")
+    st.text(prompt)
     payload = {
         "model": LLAMA_MODEL,
         "prompt": prompt,
@@ -77,12 +69,12 @@ def call_llama(prompt: str) -> str:
         response.raise_for_status()
         result_json = response.json()
         llama_response = result_json.get("response", "Error: No response from Llama")
-        print("DEBUG: Received response from Llama:")
-        print(llama_response)
+        st.write("**DEBUG: Received response from Llama:**")
+        st.text(llama_response)
         return llama_response
     except requests.RequestException as e:
         error_msg = f"Error calling Llama: {e}"
-        print("DEBUG:", error_msg)
+        st.write("**DEBUG:**", error_msg)
         return error_msg
 
 
@@ -90,15 +82,15 @@ def llama_translate(text: str, target_lang: str) -> str:
     """
     Uses Llama to translate text into the target language.
     """
-    print("DEBUG: Translating text:")
-    print(text)
-    print(f"DEBUG: Target language: {target_lang}")
+    st.write("**DEBUG: Translating text:**")
+    st.text(text)
+    st.write(f"**DEBUG: Target language:** {target_lang}")
     prompt = TRANSLATION_PROMPT_TEMPLATE.format(target_lang=target_lang, text=text)
-    print("DEBUG: Translation prompt being sent to Llama:")
-    print(prompt)
+    st.write("**DEBUG: Translation prompt being sent to Llama:**")
+    st.text(prompt)
     translation = call_llama(prompt)
-    print("DEBUG: Translation result:")
-    print(translation)
+    st.write("**DEBUG: Translation result:**")
+    st.text(translation)
     return translation
 
 
@@ -106,10 +98,10 @@ def google_search(query, gl=DEFAULT_COUNTRY, hl=DEFAULT_LANG):
     """
     Calls Google Custom Search API with location and language-based filtering.
     """
-    print("DEBUG: Performing Google search.")
-    print(f"DEBUG: Query: {query}")
-    print(f"DEBUG: Country (gl): {gl}")
-    print(f"DEBUG: Language (hl): {hl}")
+    st.write("**DEBUG: Performing Google search.**")
+    st.write(f"**DEBUG: Query:** {query}")
+    st.write(f"**DEBUG: Country (gl):** {gl}")
+    st.write(f"**DEBUG: Language (hl):** {hl}")
     url = GOOGLE_SEARCH_API_URL
     params = {
         "key": API_KEY,
@@ -123,16 +115,16 @@ def google_search(query, gl=DEFAULT_COUNTRY, hl=DEFAULT_LANG):
         response.raise_for_status()
         results = response.json()
         if "error" in results:
-            print("DEBUG: Google API Error:", results["error"])
+            st.write("**DEBUG: Google API Error:**", results["error"])
             return []
         # Return only the top 10 results
         items = results.get("items", [])[:10]
-        print("DEBUG: Google search results fetched:")
+        st.write("**DEBUG: Google search results fetched:**")
         for i, item in enumerate(items, start=1):
-            print(f"DEBUG: Result {i}: Title: {item.get('title')}, Link: {item.get('link')}")
+            st.write(f"Result {i}: Title: {item.get('title')}, Link: {item.get('link')}")
         return items
     except requests.RequestException as e:
-        print("DEBUG: Google API Exception:", e)
+        st.write("**DEBUG: Google API Exception:**", e)
         return []
 
 
@@ -140,7 +132,7 @@ def get_webpage_text(url: str) -> str:
     """
     Fetches webpage content and extracts text.
     """
-    print(f"DEBUG: Fetching webpage text from URL: {url}")
+    st.write(f"**DEBUG: Fetching webpage text from URL:** {url}")
     try:
         resp = requests.get(url, timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
@@ -148,43 +140,47 @@ def get_webpage_text(url: str) -> str:
         for tag in soup(BS_TAGS_TO_REMOVE):
             tag.decompose()
         webpage_text = soup.get_text(separator=TEXT_SEPARATOR)[:MAX_TEXT_LENGTH]
-        print("DEBUG: Extracted webpage text:")
-        print(webpage_text)
+        st.write("**DEBUG: Extracted webpage text:**")
+        st.text(webpage_text)
         return webpage_text
     except requests.RequestException as e:
         error_msg = f"Error fetching {url}: {e}"
-        print("DEBUG:", error_msg)
+        st.write("**DEBUG:**", error_msg)
         return ""
 
 
-@app.route(ROUTE_INDEX, methods=["GET", "POST"])
-def index():
-    results = []
-    summary = ""
-    query = ""
-    selected_country = DEFAULT_COUNTRY
+def main():
+    st.title("Local Search & Summarization Demo")
+    st.write(
+        "Enter your query and select a country. The app will automatically translate your query into the country's language before fetching and summarizing results.")
 
-    if request.method == "POST":
-        query = request.form.get(FORM_QUERY_KEY, "")
-        selected_country = request.form.get(FORM_COUNTRY_KEY, DEFAULT_COUNTRY)
+    # Get user input
+    query = st.text_input("Enter your query:")
 
-        print("DEBUG: Received form submission.")
-        print(f"DEBUG: User entered query: {query}")
-        print(f"DEBUG: User selected country: {selected_country}")
+    # Create a list of country codes and names for the selectbox
+    country_options = {country["code"]: country["name"] for country in supported_countries}
+    # Display the country names, but store the country code
+    selected_country = st.selectbox("Select your country:", options=list(country_options.keys()),
+                                    format_func=lambda code: country_options[code])
 
-        # Automatically determine the target language based on the selected country
+    if st.button("Search"):
+        st.write("**DEBUG: Received input**")
+        st.write(f"User entered query: {query}")
+        st.write(f"User selected country: {selected_country}")
+
+        # Determine the target language based on selected country
         comm_lang = country_to_language.get(selected_country, DEFAULT_LANG)
-        print(f"DEBUG: Determined translation language: {comm_lang}")
+        st.write(f"**DEBUG: Determined translation language:** {comm_lang}")
 
         if query:
             # Translate the query into the country's language
-            print("DEBUG: Translating the query...")
+            st.write("**DEBUG: Translating the query...**")
             translated_query = llama_translate(query, comm_lang)
-            print("DEBUG: Translated query:")
-            print(translated_query)
+            st.write("**DEBUG: Translated query:**")
+            st.text(translated_query)
 
             # Call Google Search API with the translated query
-            print("DEBUG: Calling Google Search API with the translated query...")
+            st.write("**DEBUG: Calling Google Search API with the translated query...**")
             search_results = google_search(translated_query, gl=selected_country, hl=comm_lang)
             results = []
             articles = {}
@@ -208,38 +204,38 @@ def index():
                 if title and snippet:
                     articles[title] = snippet
 
-            print("DEBUG: Fetched search results. Aggregating text for summarization...")
+            # Display the search results
+            st.subheader("Top 10 Results")
+            for idx, result in enumerate(results, start=1):
+                st.markdown(f"**{idx}. {result['title']}**")
+                st.write(result['snippet'])
+                st.write(f"[Link]({result['link']})")
+                if result['image_url']:
+                    st.image(result['image_url'], width=150)
+                st.write("---")
+
+            st.write("**DEBUG: Fetched search results. Aggregating text for summarization...**")
             # Create an aggregated text for summarization
             aggregated_text = TEXT_SEPARATOR.join(
                 [f"{i}. {title}: {snippet}" for i, (title, snippet) in enumerate(articles.items(), start=1)]
             )
-            print("DEBUG: Aggregated text:")
-            print(aggregated_text)
+            st.write("**DEBUG: Aggregated text:**")
+            st.text(aggregated_text)
 
             # Translate aggregated text for summarization into the country's language
-            print("DEBUG: Translating aggregated text for summarization...")
+            st.write("**DEBUG: Translating aggregated text for summarization...**")
             translated_text = llama_translate(aggregated_text, comm_lang)
-            print("DEBUG: Translated aggregated text:")
-            print(translated_text)
+            st.write("**DEBUG: Translated aggregated text:**")
+            st.text(translated_text)
 
-            # Build the summary prompt using the determined language
+            # Build the summary prompt and get the summary
             summary_prompt = SUMMARY_PROMPT_TEMPLATE.format(summary_lang=comm_lang, text=translated_text)
-            print("DEBUG: Summary prompt being sent to Llama:")
-            print(summary_prompt)
+            st.write("**DEBUG: Summary prompt being sent to Llama:**")
+            st.text(summary_prompt)
             summary = call_llama(summary_prompt)
-            print("DEBUG: Final summary:")
-            print(summary)
-
-    return render_template(
-        TEMPLATE_INDEX,
-        results=results,
-        summary=summary,
-        query=query,
-        selected_country=selected_country,
-        supported_countries=supported_countries
-    )
+            st.write("**DEBUG: Final summary:**")
+            st.text(summary)
 
 
 if __name__ == "__main__":
-    print("DEBUG: Starting Flask app.")
-    app.run(debug=FLASK_DEBUG)
+    main()
