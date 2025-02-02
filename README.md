@@ -8,6 +8,7 @@
 - **Oliver Sanchez** - AI & Machine Learning Specialist  
 - **Adi Singh** - Robotics Engineer & Backend Developer  
 - **Hamza Zafar** - Data Scientist & NLP Expert  
+- **Putri Azizah** - Computer Vision Expert
 
 We are a passionate team of developers and researchers dedicated to leveraging AI for impactful solutions. Our focus is on building **cutting-edge applications** that integrate **Llama models, NLP, and AI-driven automation** to tackle real-world challenges.
 
