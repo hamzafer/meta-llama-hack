@@ -25,6 +25,10 @@ TEMPLATE_INDEX = os.getenv("TEMPLATE_INDEX", "index.html")
 REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "5"))
 FLASK_DEBUG = os.getenv("FLASK_DEBUG", "True").lower() in ("true", "1", "t")
 
+# New form field and default for summary language
+FORM_SUMMARY_LANG_KEY = os.getenv("FORM_SUMMARY_LANG_KEY", "summary_lang")
+DEFAULT_SUMMARY_LANG = os.getenv("DEFAULT_SUMMARY_LANG", DEFAULT_LANG)
+
 # Prompt templates (customizable)
 TRANSLATION_PROMPT_TEMPLATE = os.getenv(
     "TRANSLATION_PROMPT_TEMPLATE",
@@ -158,26 +162,30 @@ def get_webpage_text(url: str) -> str:
 
 
 @app.route(ROUTE_INDEX, methods=["GET", "POST"])
+@app.route(ROUTE_INDEX, methods=["GET", "POST"])
 def index():
     results = []
     summary = ""
     query = ""
     selected_country = DEFAULT_COUNTRY
+    summary_lang = DEFAULT_SUMMARY_LANG  # default summary language
 
     if request.method == "POST":
         query = request.form.get(FORM_QUERY_KEY, "")
         selected_country = request.form.get(FORM_COUNTRY_KEY, DEFAULT_COUNTRY)
+        summary_lang = request.form.get(FORM_SUMMARY_LANG_KEY, DEFAULT_SUMMARY_LANG)
 
         print("DEBUG: Received form submission.")
         print(f"DEBUG: User entered query: {query}")
         print(f"DEBUG: User selected country: {selected_country}")
+        print(f"DEBUG: User selected summary language: {summary_lang}")
 
-        # Automatically determine the target language based on the selected country
+        # Determine the language for searching based on the selected country
         comm_lang = country_to_language.get(selected_country, DEFAULT_LANG)
-        print(f"DEBUG: Determined translation language: {comm_lang}")
+        print(f"DEBUG: Determined search translation language: {comm_lang}")
 
         if query:
-            # Translate the query into the country's language
+            # Translate the query into the country's language for search purposes
             print("DEBUG: Translating the query...")
             translated_query = llama_translate(query, comm_lang)
             print("DEBUG: Translated query:")
@@ -209,21 +217,20 @@ def index():
                     articles[title] = snippet
 
             print("DEBUG: Fetched search results. Aggregating text for summarization...")
-            # Create an aggregated text for summarization
             aggregated_text = TEXT_SEPARATOR.join(
                 [f"{i}. {title}: {snippet}" for i, (title, snippet) in enumerate(articles.items(), start=1)]
             )
             print("DEBUG: Aggregated text:")
             print(aggregated_text)
 
-            # Translate aggregated text for summarization into the country's language
+            # Translate the aggregated text into the **summary language** (instead of comm_lang)
             print("DEBUG: Translating aggregated text for summarization...")
-            translated_text = llama_translate(aggregated_text, comm_lang)
+            translated_text = llama_translate(aggregated_text, summary_lang)
             print("DEBUG: Translated aggregated text:")
             print(translated_text)
 
-            # Build the summary prompt using the determined language
-            summary_prompt = SUMMARY_PROMPT_TEMPLATE.format(summary_lang=comm_lang, text=translated_text)
+            # Build the summary prompt using the summary language
+            summary_prompt = SUMMARY_PROMPT_TEMPLATE.format(summary_lang=summary_lang, text=translated_text)
             print("DEBUG: Summary prompt being sent to Llama:")
             print(summary_prompt)
             summary = call_llama(summary_prompt)
@@ -236,6 +243,7 @@ def index():
         summary=summary,
         query=query,
         selected_country=selected_country,
+        summary_lang=summary_lang,  # pass it to the template so the drop-down can persist the choice
         supported_countries=supported_countries
     )
 
