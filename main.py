@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import re
 
 import requests
 from bs4 import BeautifulSoup
@@ -9,7 +10,7 @@ from flask import Flask, request, render_template
 # Load environment variables from .env file
 load_dotenv()
 
-USE_STATIC_RESULTS = os.getenv("USE_STATIC_RESULTS", "True").lower() in ("true", "1", "t")
+USE_STATIC_RESULTS = os.getenv("USE_STATIC_RESULTS", "False").lower() in ("true", "1", "t")
 
 # Core configuration (overridable via environment variables)
 API_KEY = os.getenv("API_KEY")
@@ -120,61 +121,61 @@ def google_search(query, gl=DEFAULT_COUNTRY, hl=DEFAULT_LANG):
                 "title": "Trikk krasjet i Oslo: Føreren er siktet",
                 "snippet": "Resultat fra VG: Trikk krasjet i Oslo med siktet fører. Fire skadde.",
                 "link": "https://www.vg.no/nyheter/i/vgxjaX/trikk-krasjet-i-butikk-i-oslo-trikkefoereren-er-siktet",
-                "image_url": None
+                "image_url": "https://www.vg.no/images/2024/10/29/Trikk-krasjet-i-butikk-i-Oslo.jpg"
             },
             {
                 "title": "Trikk, Ulykke | Trikk krasjet inn i Eplehuset i Storgata",
                 "snippet": "Resultat fra ao.no: Trikk krasjet inn i Eplehuset i Storgata.",
                 "link": "https://www.ao.no/trikki-butikk-i-storgata/s/5-128-914143",
-                "image_url": None
+                "image_url": "https://www.vg.no/images/2024/10/29/Trikk-krasjet-i-butikk-i-Oslo.jpg"
             },
             {
                 "title": "Trikkeulykken i Oslo henlegges – Stor-Oslo",
                 "snippet": "Resultat fra NRK: Trikkeulykken i Oslo henlegges.",
                 "link": "https://www.nrk.no/stor-oslo/trikkeulykken-i-oslo-henlegges-1.17178415",
-                "image_url": None
+                "image_url": "https://www.vg.no/images/2024/10/29/Trikk-krasjet-i-butikk-i-Oslo.jpg"
             },
             {
                 "title": "Oslo trikkulykke. Mannen ble hardt skadet",
                 "snippet": "Resultat fra Wataha: Oslo trikkulykke med hardt skadet mann.",
                 "link": "https://wataha.no/no/2021/10/05/oslo-wypadek-tramwajowy-mezczyzna-ciezko-ranny/",
-                "image_url": None
+                "image_url": "https://www.vg.no/images/2024/10/29/Trikk-krasjet-i-butikk-i-Oslo.jpg"
             },
             {
                 "title": "Trikkeulykken i Storgata – Stor-Oslo",
                 "snippet": "Resultat fra NRK: Trikkeulykken i Storgata.",
                 "link": "https://www.nrk.no/stor-oslo/trikkeulykken-i-storgata-1.17104779",
-                "image_url": None
+                "image_url": "https://www.vg.no/images/2024/10/29/Trikk-krasjet-i-butikk-i-Oslo.jpg"
             },
             {
                 "title": "Trikk, Ulykke | Person påkjørt av trikk i Oslo",
                 "snippet": "Resultat fra Nettavisen: Person påkjørt av trikk i Oslo.",
                 "link": "https://www.nettavisen.no/nyheter/person-pakjort-av-trikk-i-oslo/s/12-95-3423942827",
-                "image_url": None
+                "image_url": "https://www.vg.no/images/2024/10/29/Trikk-krasjet-i-butikk-i-Oslo.jpg"
             },
             {
                 "title": "Trikk sporet av og krasjet inn i butikk i Oslo sentrum: Fire personer ...",
                 "snippet": "Resultat fra Inyheter: Trikk sporet av og krasjet inn i butikk i Oslo sentrum.",
                 "link": "https://inyheter.no/29/10/2024/trikk-sporet-av-og-krasjet-inn-i-butikk-i-oslo-sentrum-fire-personer-skadet/",
-                "image_url": None
+                "image_url": "https://www.vg.no/images/2024/10/29/Trikk-krasjet-i-butikk-i-Oslo.jpg"
             },
             {
                 "title": "Trikkeulykken i Storgata – Wikipedia",
                 "snippet": "Resultat fra Wikipedia: Informasjon om trikkeulykken i Storgata.",
                 "link": "https://no.wikipedia.org/wiki/Trikkeulykken_i_Storgata",
-                "image_url": None
+                "image_url": "https://www.vg.no/images/2024/10/29/Trikk-krasjet-i-butikk-i-Oslo.jpg"
             },
             {
                 "title": "Avisa Oslo | Den lille taco-trucken i Schweigaards gate blir omfavnet ...",
                 "snippet": "Resultat fra Instagram: Den lille taco-trucken i Schweigaards gate.",
                 "link": "https://www.instagram.com/avisaoslo/reel/C-MtkbRo80h/",
-                "image_url": None
+                "image_url": "https://www.vg.no/images/2024/10/29/Trikk-krasjet-i-butikk-i-Oslo.jpg"
             },
             {
                 "title": "Trikkeulykken i Oslo: Politiet henlegger saken: - Glad det ikke gikk ...",
                 "snippet": "Resultat fra TV2: Politiet henlegger saken etter trikkulykke.",
                 "link": "https://www.tv2.no/nyheter/politiet-henlegger-saken-glad-det-ikke-gikk-verre/17300477/",
-                "image_url": None
+                "image_url": "https://www.vg.no/images/2024/10/29/Trikk-krasjet-i-butikk-i-Oslo.jpg"
             },
         ]
         return static_results
@@ -316,8 +317,6 @@ def index():
 
             print('results: ', results)
             # print(5/0)
-            
-            
 
             # Build the summary prompt using the summary language
             summary_prompt = SUMMARY_PROMPT_TEMPLATE.format(summary_lang=summary_lang, text=translated_text)
