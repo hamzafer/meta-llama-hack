@@ -9,13 +9,15 @@ from flask import Flask, request, render_template
 # Load environment variables from .env file
 load_dotenv()
 
+USE_STATIC_RESULTS = os.getenv("USE_STATIC_RESULTS", "True").lower() in ("true", "1", "t")
+
 # Core configuration (overridable via environment variables)
 API_KEY = os.getenv("API_KEY")
 SEARCH_ENGINE_ID = os.getenv("SEARCH_ENGINE_ID")
-LLAMA_API_URL = os.getenv("LLAMA_API_URL", "http://localhost:11435/api/generate")
-LLAMA_MODEL = os.getenv("LLAMA_MODEL", "llama3.3")
+LLAMA_API_URL = os.getenv("LLAMA_API_URL", "http://localhost:11434/api/generate")
+LLAMA_MODEL = os.getenv("LLAMA_MODEL", "llama3.3:70b")
 DEFAULT_LANG = os.getenv("DEFAULT_LANG", "en")  # fallback language if country not found
-DEFAULT_COUNTRY = os.getenv("DEFAULT_COUNTRY", "us")
+DEFAULT_COUNTRY = os.getenv("DEFAULT_COUNTRY", "no")
 GOOGLE_SEARCH_API_URL = os.getenv("GOOGLE_SEARCH_API_URL", "https://www.googleapis.com/customsearch/v1")
 BS_PARSER = os.getenv("BS_PARSER", "html.parser")
 BS_TAGS_TO_REMOVE = os.getenv("BS_TAGS_TO_REMOVE", "script,style,noscript").split(',')
@@ -109,7 +111,74 @@ def llama_translate(text: str, target_lang: str) -> str:
 def google_search(query, gl=DEFAULT_COUNTRY, hl=DEFAULT_LANG):
     """
     Calls Google Custom Search API with location and language-based filtering.
+    If USE_STATIC_RESULTS is True, return the static (pre-defined) results.
     """
+    if USE_STATIC_RESULTS:
+        print("DEBUG: Returning static search results.")
+        static_results = [
+            {
+                "title": "Trikk krasjet i Oslo: Føreren er siktet",
+                "snippet": "Resultat fra VG: Trikk krasjet i Oslo med siktet fører. Fire skadde.",
+                "link": "https://www.vg.no/nyheter/i/vgxjaX/trikk-krasjet-i-butikk-i-oslo-trikkefoereren-er-siktet",
+                "image_url": None
+            },
+            {
+                "title": "Trikk, Ulykke | Trikk krasjet inn i Eplehuset i Storgata",
+                "snippet": "Resultat fra ao.no: Trikk krasjet inn i Eplehuset i Storgata.",
+                "link": "https://www.ao.no/trikki-butikk-i-storgata/s/5-128-914143",
+                "image_url": None
+            },
+            {
+                "title": "Trikkeulykken i Oslo henlegges – Stor-Oslo",
+                "snippet": "Resultat fra NRK: Trikkeulykken i Oslo henlegges.",
+                "link": "https://www.nrk.no/stor-oslo/trikkeulykken-i-oslo-henlegges-1.17178415",
+                "image_url": None
+            },
+            {
+                "title": "Oslo trikkulykke. Mannen ble hardt skadet",
+                "snippet": "Resultat fra Wataha: Oslo trikkulykke med hardt skadet mann.",
+                "link": "https://wataha.no/no/2021/10/05/oslo-wypadek-tramwajowy-mezczyzna-ciezko-ranny/",
+                "image_url": None
+            },
+            {
+                "title": "Trikkeulykken i Storgata – Stor-Oslo",
+                "snippet": "Resultat fra NRK: Trikkeulykken i Storgata.",
+                "link": "https://www.nrk.no/stor-oslo/trikkeulykken-i-storgata-1.17104779",
+                "image_url": None
+            },
+            {
+                "title": "Trikk, Ulykke | Person påkjørt av trikk i Oslo",
+                "snippet": "Resultat fra Nettavisen: Person påkjørt av trikk i Oslo.",
+                "link": "https://www.nettavisen.no/nyheter/person-pakjort-av-trikk-i-oslo/s/12-95-3423942827",
+                "image_url": None
+            },
+            {
+                "title": "Trikk sporet av og krasjet inn i butikk i Oslo sentrum: Fire personer ...",
+                "snippet": "Resultat fra Inyheter: Trikk sporet av og krasjet inn i butikk i Oslo sentrum.",
+                "link": "https://inyheter.no/29/10/2024/trikk-sporet-av-og-krasjet-inn-i-butikk-i-oslo-sentrum-fire-personer-skadet/",
+                "image_url": None
+            },
+            {
+                "title": "Trikkeulykken i Storgata – Wikipedia",
+                "snippet": "Resultat fra Wikipedia: Informasjon om trikkeulykken i Storgata.",
+                "link": "https://no.wikipedia.org/wiki/Trikkeulykken_i_Storgata",
+                "image_url": None
+            },
+            {
+                "title": "Avisa Oslo | Den lille taco-trucken i Schweigaards gate blir omfavnet ...",
+                "snippet": "Resultat fra Instagram: Den lille taco-trucken i Schweigaards gate.",
+                "link": "https://www.instagram.com/avisaoslo/reel/C-MtkbRo80h/",
+                "image_url": None
+            },
+            {
+                "title": "Trikkeulykken i Oslo: Politiet henlegger saken: - Glad det ikke gikk ...",
+                "snippet": "Resultat fra TV2: Politiet henlegger saken etter trikkulykke.",
+                "link": "https://www.tv2.no/nyheter/politiet-henlegger-saken-glad-det-ikke-gikk-verre/17300477/",
+                "image_url": None
+            },
+        ]
+        return static_results
+
     print("DEBUG: Performing Google search.")
     print(f"DEBUG: Query: {query}")
     print(f"DEBUG: Country (gl): {gl}")
@@ -220,14 +289,35 @@ def index():
             aggregated_text = TEXT_SEPARATOR.join(
                 [f"{i}. {title}: {snippet}" for i, (title, snippet) in enumerate(articles.items(), start=1)]
             )
+            
+
             print("DEBUG: Aggregated text:")
             print(aggregated_text)
+
+
 
             # Translate the aggregated text into the **summary language** (instead of comm_lang)
             print("DEBUG: Translating aggregated text for summarization...")
             translated_text = llama_translate(aggregated_text, summary_lang)
+            
             print("DEBUG: Translated aggregated text:")
             print(translated_text)
+            
+            import re #ugly i knowwww
+            
+            pattern = re.compile(r'\d+\.\s(.*?):\s(.*)')
+            parsed_data = []
+            for match in pattern.finditer(translated_text):
+                parsed_data.append((match.group(1).strip(), match.group(2).strip()))
+
+            for i, (title, snippet) in enumerate(parsed_data):
+                results[i]["title"] = title
+                results[i]["snippet"] = snippet
+
+            print('results: ', results)
+            # print(5/0)
+            
+            
 
             # Build the summary prompt using the summary language
             summary_prompt = SUMMARY_PROMPT_TEMPLATE.format(summary_lang=summary_lang, text=translated_text)
