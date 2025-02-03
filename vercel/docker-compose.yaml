@@ -1,0 +1,36 @@
+services:
+  frontend:
+    volumes:
+      - ./frontend/app:/app/app
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - 3000:3000
+    depends_on:
+      - backend
+  backend:
+    volumes:
+      - ./backend:/app
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - 8000:8000
+    depends_on:
+      - redis
+  redis:
+    image: redis:alpine
+  searxng:
+    image: searxng/searxng:latest
+    volumes:
+      - ./ops/searxng:/etc/searxng
+    ports:
+      - 8080:8080
+    environment:
+      - SEARXNG_URL=http://localhost:8080/
+      - SEARXNG_SECRET=SQRXTEUTa%SMuWDiF_kyH&,:EqBpTV
+      - SEARXNG_REDIS_URL=redis://redis:6379/0
+      - SEARXNG_SETTINGS_PATH=/etc/searxng/settings.yml
+    depends_on:
+      - redis
