@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import os
 import re
-
+#Why do we fall sir?
 import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
