@@ -2,7 +2,7 @@
 import os
 import re
 #Why do we fall sir?
-#So that we can learn to pick ourselves up.
+#So that we can learn to pick ourselves up :)
 import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
